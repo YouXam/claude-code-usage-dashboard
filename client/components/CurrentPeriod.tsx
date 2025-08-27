@@ -43,14 +43,19 @@ interface CurrentPeriodProps {
 export function CurrentPeriod({ period, apiKey, userId }: CurrentPeriodProps) {
   const [summary, setSummary] = useState<PeriodSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
     fetchSummary();
   }, [period.index]);
 
-  const fetchSummary = async () => {
-    setIsLoading(true);
+  const fetchSummary = async (isRefresh = false) => {
+    if (isRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     setError('');
 
     try {
@@ -69,7 +74,11 @@ export function CurrentPeriod({ period, apiKey, userId }: CurrentPeriodProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load period data');
     } finally {
-      setIsLoading(false);
+      if (isRefresh) {
+        setIsRefreshing(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -103,13 +112,71 @@ export function CurrentPeriod({ period, apiKey, userId }: CurrentPeriodProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
+        {/* Header skeleton */}
         <div className="bg-card p-6 rounded-lg shadow-sm border border-border animate-pulse">
-          <div className="h-6 bg-muted rounded w-1/3 mb-4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="h-20 bg-muted rounded"></div>
-            <div className="h-20 bg-muted rounded"></div>
-            <div className="h-20 bg-muted rounded"></div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-6 bg-muted rounded w-2/3"></div>
+            <div className="h-8 w-20 bg-muted rounded"></div>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="h-8 bg-muted rounded w-24 mx-auto mb-2"></div>
+              <div className="h-4 bg-muted rounded w-16 mx-auto"></div>
+            </div>
+            <div className="text-center">
+              <div className="h-8 bg-muted rounded w-16 mx-auto mb-2"></div>
+              <div className="h-4 bg-muted rounded w-20 mx-auto"></div>
+            </div>
+            <div className="text-center">
+              <div className="h-8 bg-muted rounded w-20 mx-auto mb-2"></div>
+              <div className="h-4 bg-muted rounded w-32 mx-auto"></div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Ranking table skeleton */}
+        <div className="bg-card rounded-lg shadow-sm border border-border animate-pulse">
+          <div className="p-6 border-b border-border">
+            <div className="h-6 bg-muted rounded w-32"></div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="px-6 py-3"><div className="h-4 bg-muted rounded w-12"></div></th>
+                  <th className="px-6 py-3"><div className="h-4 bg-muted rounded w-16"></div></th>
+                  <th className="px-6 py-3"><div className="h-4 bg-muted rounded w-16"></div></th>
+                  <th className="px-6 py-3"><div className="h-4 bg-muted rounded w-20"></div></th>
+                  <th className="px-6 py-3"><div className="h-4 bg-muted rounded w-16"></div></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {[...Array(3)].map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-6 py-4"><div className="h-6 w-6 bg-muted rounded-full"></div></td>
+                    <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-20"></div></td>
+                    <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-16"></div></td>
+                    <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-12"></div></td>
+                    <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-12"></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        {/* User detail card skeleton */}
+        <div className="bg-card p-6 rounded-lg shadow-sm border border-border animate-pulse">
+          <div className="h-6 bg-muted rounded w-48 mb-6"></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="text-center">
+                <div className="h-6 bg-muted rounded w-16 mx-auto mb-2"></div>
+                <div className="h-4 bg-muted rounded w-12 mx-auto"></div>
+              </div>
+            ))}
+          </div>
+          <div className="h-10 bg-muted rounded w-32"></div>
         </div>
       </div>
     );
@@ -139,9 +206,26 @@ export function CurrentPeriod({ period, apiKey, userId }: CurrentPeriodProps) {
     <div className="space-y-6">
       {/* Header with period info */}
       <div className="bg-card p-6 rounded-lg shadow-sm border border-border">
-        <h2 className="text-lg font-semibold text-card-foreground mb-4">
-          Current Period: {formatDate(summary.period.startAt)} → {formatDate(summary.period.endAt, true)}
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-card-foreground">
+            Current Period: {formatDate(summary.period.startAt)} → Now
+          </h2>
+          <button
+            onClick={() => fetchSummary(true)}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg 
+              className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="text-center">

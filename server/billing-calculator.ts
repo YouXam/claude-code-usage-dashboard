@@ -242,6 +242,11 @@ export class BillingCalculator {
 
     const result = computePeriodDelta(startData, endData, meId);
 
+    // Filter out users with zero activity (cost, requests, and tokens all 0)
+    const activeUsers = result.users.filter(u => 
+      u.cost > 0 || u.periodTokens > 0 || u.periodRequests > 0
+    );
+
     return {
       period: {
         ...period,
@@ -249,9 +254,9 @@ export class BillingCalculator {
       },
       totals: {
         totalCost: result.totalCost,
-        userCount: result.users.filter(u => u.cost > 0).length
+        userCount: activeUsers.length
       },
-      ranking: result.users
+      ranking: activeUsers
     };
   }
 

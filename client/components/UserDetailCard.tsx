@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 interface UserDetail {
   id: string;
@@ -41,7 +41,7 @@ export function UserDetailCard({ periodIndex, apiKey, userId }: UserDetailCardPr
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error('You are not found in this period (possibly deleted)');
+          throw new Error('You are not found in this period');
         }
         throw new Error(`Failed to fetch user details: ${response.status}`);
       }
@@ -92,13 +92,13 @@ export function UserDetailCard({ periodIndex, apiKey, userId }: UserDetailCardPr
         <h3 className="text-lg font-medium text-card-foreground mb-4">Your Usage Details</h3>
         <div className="bg-chart-3/20 border border-chart-3/50 rounded-md p-4">
           <div className="flex">
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 text-muted-foreground">
               <svg className="h-5 w-5 text-chart-3" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-chart-3">{error}</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
             </div>
           </div>
         </div>
@@ -186,9 +186,25 @@ export function UserDetailCard({ periodIndex, apiKey, userId }: UserDetailCardPr
         <div className="space-y-4">
           <div>
             <h4 className="text-sm font-medium text-card-foreground mb-2">Period Start Data</h4>
-            <pre className="text-xs bg-muted/50 p-4 rounded-lg overflow-x-auto border border-border">
-              {JSON.stringify(userDetail.raw.start, null, 2)}
-            </pre>
+            {userDetail.raw.start ? (
+              <pre className="text-xs bg-muted/50 p-4 rounded-lg overflow-x-auto border border-border">
+                {JSON.stringify(userDetail.raw.start, null, 2)}
+              </pre>
+            ) : (
+              <div className="text-xs bg-muted/20 p-4 rounded-lg border border-border text-center">
+                <div className="text-muted-foreground mb-2">
+                  <svg className="h-8 w-8 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="text-sm font-medium text-card-foreground mb-1">
+                  No Start Data Available
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  This likely means you had no usage before the start of this period.
+                </div>
+              </div>
+            )}
           </div>
           <div>
             <h4 className="text-sm font-medium text-card-foreground mb-2">Period End Data</h4>

@@ -283,14 +283,71 @@ export function HistoricalPeriods({ periods, apiKey, userId }: HistoricalPeriods
         <>
           {/* Period Summary */}
           {isLoading ? (
-            <div className="bg-card p-6 rounded-lg shadow-sm border border-border animate-pulse">
-              <div className="h-6 bg-muted rounded w-1/3 mb-4"></div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="h-20 bg-muted rounded"></div>
-                <div className="h-20 bg-muted rounded"></div>
-                <div className="h-20 bg-muted rounded"></div>
+            <>
+              {/* Period summary skeleton */}
+              <div className="bg-card p-6 rounded-lg shadow-sm border border-border animate-pulse">
+                <div className="h-6 bg-muted rounded w-1/2 mb-4"></div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center">
+                    <div className="h-8 bg-muted rounded w-24 mx-auto mb-2"></div>
+                    <div className="h-4 bg-muted rounded w-16 mx-auto"></div>
+                  </div>
+                  <div className="text-center">
+                    <div className="h-8 bg-muted rounded w-16 mx-auto mb-2"></div>
+                    <div className="h-4 bg-muted rounded w-20 mx-auto"></div>
+                  </div>
+                  <div className="text-center">
+                    <div className="h-8 bg-muted rounded w-20 mx-auto mb-2"></div>
+                    <div className="h-4 bg-muted rounded w-32 mx-auto"></div>
+                  </div>
+                </div>
               </div>
-            </div>
+              
+              {/* Ranking table skeleton */}
+              <div className="bg-card rounded-lg shadow-sm border border-border animate-pulse">
+                <div className="p-6 border-b border-border">
+                  <div className="h-6 bg-muted rounded w-32"></div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-6 py-3"><div className="h-4 bg-muted rounded w-12"></div></th>
+                        <th className="px-6 py-3"><div className="h-4 bg-muted rounded w-16"></div></th>
+                        <th className="px-6 py-3"><div className="h-4 bg-muted rounded w-16"></div></th>
+                        <th className="px-6 py-3"><div className="h-4 bg-muted rounded w-20"></div></th>
+                        <th className="px-6 py-3"><div className="h-4 bg-muted rounded w-16"></div></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {[...Array(3)].map((_, i) => (
+                        <tr key={i}>
+                          <td className="px-6 py-4"><div className="h-6 w-6 bg-muted rounded-full"></div></td>
+                          <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-20"></div></td>
+                          <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-16"></div></td>
+                          <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-12"></div></td>
+                          <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-12"></div></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              {/* User detail card skeleton */}
+              <div className="bg-card p-6 rounded-lg shadow-sm border border-border animate-pulse">
+                <div className="h-6 bg-muted rounded w-48 mb-6"></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="text-center">
+                      <div className="h-6 bg-muted rounded w-16 mx-auto mb-2"></div>
+                      <div className="h-4 bg-muted rounded w-12 mx-auto"></div>
+                    </div>
+                  ))}
+                </div>
+                <div className="h-10 bg-muted rounded w-32"></div>
+              </div>
+            </>
           ) : error ? (
             <div className="bg-card p-8 rounded-lg shadow-sm border border-border text-center">
               <div className="text-destructive mb-4">
