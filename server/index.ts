@@ -159,10 +159,10 @@ Bun.serve({
       }
     }
   },
-  // development: {
-  //   hmr: true,
-  //   console: true,
-  // }
+  development: {
+    hmr: Bun.env.DEV === "development",
+    console: Bun.env.DEV === "development"
+  }
 });
 
 console.log(`Server running on http://localhost:${port}`);
