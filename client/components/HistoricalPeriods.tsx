@@ -40,12 +40,66 @@ interface HistoricalPeriodsProps {
   userId: string;
 }
 
+interface PeriodOption {
+  period: Period;
+  totalCost: number | null; // null means still loading
+}
+
 export function HistoricalPeriods({ periods, apiKey, userId }: HistoricalPeriodsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<Period | null>(null);
   const [summary, setSummary] = useState<PeriodSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [periodOptions, setPeriodOptions] = useState<PeriodOption[]>([]);
+  const [isSelectOpen, setIsSelectOpen] = useState(false);
 
+  // Fetch total costs for all periods
+  useEffect(() => {
+    const fetchAllPeriodCosts = async () => {
+      if (periods.length === 0) return;
+      
+      // Initialize with loading state (totalCost: null)
+      const initialOptions: PeriodOption[] = periods.map(period => ({
+        period,
+        totalCost: null
+      }));
+      setPeriodOptions(initialOptions);
+      
+      if (!selectedPeriod && initialOptions.length > 0) {
+        setSelectedPeriod(initialOptions[0].period);
+      }
+      
+      // Fetch costs individually to update progressively
+      const updatedOptions = [...initialOptions];
+      
+      for (let i = 0; i < periods.length; i++) {
+        const period = periods[i];
+        try {
+          const response = await fetch(`/api/periods/${period.index}/summary`, {
+            headers: { 'X-API-Key': apiKey },
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            updatedOptions[i] = { 
+              period, 
+              totalCost: data.totals?.totalCost || 0 
+            };
+          } else {
+            updatedOptions[i] = { period, totalCost: 0 };
+          }
+        } catch {
+          updatedOptions[i] = { period, totalCost: 0 };
+        }
+        
+        // Update state after each fetch for progressive loading
+        setPeriodOptions([...updatedOptions]);
+      }
+    };
+    
+    fetchAllPeriodCosts();
+  }, [periods, apiKey]);
+  
   useEffect(() => {
     if (periods.length > 0 && !selectedPeriod) {
       setSelectedPeriod(periods[0] || null); // Select the most recent historical period
@@ -83,8 +137,8 @@ export function HistoricalPeriods({ periods, apiKey, userId }: HistoricalPeriods
     }
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Unknown';
+  const formatDate = (dateString: string | null, isFirstPeriod: boolean = false) => {
+    if (!dateString) return isFirstPeriod ? 'Beginning' : 'Unknown';
     const date = new Date(dateString);
     return date.toLocaleString('zh-CN', {
       timeZone: 'Asia/Shanghai',
@@ -97,8 +151,8 @@ export function HistoricalPeriods({ periods, apiKey, userId }: HistoricalPeriods
     });
   };
 
-  const formatDateRange = (startAt: string | null, endAt: string | null) => {
-    return `${formatDate(startAt)} → ${formatDate(endAt)}`;
+  const formatDateRange = (startAt: string | null, endAt: string | null, isFirstPeriod: boolean = false) => {
+    return `${formatDate(startAt, isFirstPeriod)} → ${formatDate(endAt)}`;
   };
 
   const formatCurrency = (amount: number) => {
@@ -130,25 +184,99 @@ export function HistoricalPeriods({ periods, apiKey, userId }: HistoricalPeriods
     <div className="space-y-6">
       {/* Period Selector */}
       <div className="bg-card p-6 rounded-lg shadow-sm border border-border">
-        <label htmlFor="period-select" className="block text-lg font-medium text-card-foreground mb-4">
+        <label className="block text-lg font-medium text-card-foreground mb-4">
           Select Historical Period
         </label>
-        <select
-          id="period-select"
-          value={selectedPeriod?.index ?? ''}
-          onChange={(e) => {
-            const periodIndex = parseInt(e.target.value);
-            const period = periods.find(p => p.index === periodIndex);
-            setSelectedPeriod(period || null);
-          }}
-          className="block w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring sm:text-sm bg-background text-foreground"
-        >
-          {periods.map((period) => (
-            <option key={period.index} value={period.index}>
-              Period #{period.index} - {formatDateRange(period.startAt, period.endAt)}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsSelectOpen(!isSelectOpen)}
+            className="flex w-full items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span className="text-foreground">
+              {selectedPeriod ? (
+                <span className="flex items-center justify-between w-full">
+                  <span>
+                    Period #{selectedPeriod.index} - {formatDateRange(
+                      selectedPeriod.startAt, 
+                      selectedPeriod.endAt,
+                      selectedPeriod.index === 0
+                    )}
+                  </span>
+                  <span className="ml-2 text-primary font-medium">
+                    {(() => {
+                      const option = periodOptions.find(opt => opt.period.index === selectedPeriod.index);
+                      if (!option || option.totalCost === null) {
+                        return (
+                          <span className="flex items-center">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mr-1"></div>
+                            Loading...
+                          </span>
+                        );
+                      }
+                      return formatCurrency(option.totalCost);
+                    })()}
+                  </span>
+                </span>
+              ) : (
+                'Select a period...'
+              )}
+            </span>
+            <svg
+              className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isSelectOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {isSelectOpen && (
+            <div className="absolute top-full left-0 right-0 z-50 mt-2 max-h-60 overflow-auto rounded-md border border-border bg-card shadow-lg">
+              {periodOptions.map((option) => (
+                <button
+                  key={option.period.index}
+                  onClick={() => {
+                    setSelectedPeriod(option.period);
+                    setIsSelectOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between px-3 py-3 text-sm hover:bg-accent hover:text-accent-foreground ${
+                    selectedPeriod?.index === option.period.index
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-card-foreground'
+                  }`}
+                >
+                  <span>
+                    Period #{option.period.index} - {formatDateRange(
+                      option.period.startAt, 
+                      option.period.endAt,
+                      option.period.index === 0
+                    )}
+                  </span>
+                  <span className="ml-2 text-primary font-medium">
+                    {option.totalCost === null ? (
+                      <span className="flex items-center">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mr-1"></div>
+                        Loading...
+                      </span>
+                    ) : (
+                      formatCurrency(option.totalCost)
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Click overlay to close dropdown */}
+        {isSelectOpen && (
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsSelectOpen(false)}
+          />
+        )}
       </div>
 
       {selectedPeriod && (
@@ -183,7 +311,7 @@ export function HistoricalPeriods({ periods, apiKey, userId }: HistoricalPeriods
             <>
               <div className="bg-card p-6 rounded-lg shadow-sm border border-border">
                 <h2 className="text-lg font-semibold text-card-foreground mb-4">
-                  Period #{selectedPeriod.index}: {formatDateRange(summary.period.startAt, summary.period.endAt)}
+                  Period #{selectedPeriod.index}: {formatDateRange(summary.period.startAt, summary.period.endAt, selectedPeriod.index === 0)}
                 </h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
