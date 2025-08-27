@@ -1,7 +1,7 @@
 {
-  "name": "ai-usage-dashboard",
+  "name": "claude-code-usage-dashboard",
   "version": "1.0.0",
-  "description": "AI API Usage Dashboard with billing period tracking",
+  "description": "Claude Code Usage Dashboard with billing period tracking",
   "main": "server/index.ts",
   "type": "module",
   "private": true,
