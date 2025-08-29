@@ -9,6 +9,7 @@ interface ApiKeysResponse {
   data: Array<{
     id: string;
     name: string;
+    tags: string[];
     usage: {
       total: {
         cost: number;
@@ -123,7 +124,7 @@ export class ApiClient {
       throw new Error('Invalid response format from admin/api-keys');
     }
 
-    return data.data;
+    return data.data.filter(user => !user.tags.includes("noshare"));
   }
 
   async getKeyId(apiKey: string): Promise<string> {
