@@ -4,26 +4,42 @@ interface LoginResponse {
   expiresIn: number;
 }
 
+interface KeyUsageStatus {
+  cost: number;
+  tokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreateTokens: number;
+  cacheReadTokens: number;
+  requests: number;
+  formattedCost: string;
+}
+
 interface ApiKeysResponse {
   success: boolean;
-  data: Array<{
-    id: string;
-    name: string;
-    tags: string[];
-    usage: {
-      total: {
-        cost: number;
-        tokens: number;
-        inputTokens: number;
-        outputTokens: number;
-        cacheCreateTokens: number;
-        cacheReadTokens: number;
-        requests: number;
-        formattedCost: string;
+  data: {
+    availableTags: string[];
+    items: Array<{
+      id: string;
+      name: string;
+      tags: string[];
+      usage: {
+        total: KeyUsageStatus;
       };
-    };
-    [key: string]: any;
-  }>;
+      [key: string]: any;
+    }>
+    pagination: {
+      page: number;
+      pageSize: number;
+      total: number;
+      totalPages: number;
+    }
+  };
+}
+
+interface BatchStatsResponse {
+  success: boolean;
+  data: Record<string, KeyUsageStatus>
 }
 
 interface KeyIdResponse {
@@ -103,7 +119,7 @@ export class ApiClient {
     }
   }
 
-  async getCurrentCosts(): Promise<ApiKeysResponse['data']> {
+  async getCurrentCosts(): Promise<ApiKeysResponse['data']['items']> {
     await this.ensureValidToken();
 
     const response = await fetch(`${this.baseUrl}/admin/api-keys?timeRange=all`, {
@@ -120,11 +136,40 @@ export class ApiClient {
 
     const data = await response.json() as ApiKeysResponse;
     
-    if (!data.success || !Array.isArray(data.data)) {
+    if (!data.success || !Array.isArray(data.data.items)) {
       throw new Error('Invalid response format from admin/api-keys');
     }
 
-    return data.data.filter(user => !user.tags.includes("noshare"));
+    const noShareApiKeys = data.data.items.filter(user => !user.tags || !user.tags.includes("noshare"))
+
+    const keyIds = noShareApiKeys.map(user => user.id);
+
+    const batchStatsResponse = await fetch(`${this.baseUrl}/admin/api-keys/batch-stats`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        keyIds,
+        timeRange: 'all',
+      }),
+    })
+
+    if (!batchStatsResponse.ok) {
+      throw new Error(`Failed to fetch batch stats: ${batchStatsResponse.status} ${batchStatsResponse.statusText}`);
+    }
+
+    const batchStatsData = await batchStatsResponse.json() as BatchStatsResponse;
+
+    for (const user of noShareApiKeys) {
+      const keyUsage = batchStatsData.data[user.id];
+      if (keyUsage) {
+        user.usage.total = keyUsage;
+      }
+    }
+
+    return noShareApiKeys;
   }
 
   async getKeyId(apiKey: string): Promise<string> {
