@@ -164,6 +164,11 @@ export class ApiClient {
     return data.data;
   }
 
+  private sanitizeApiKeyItem(item: ApiKeyListItem): ApiKeyListItem {
+    const { apiKey, ...rest } = item;
+    return rest;
+  }
+
   private async fetchUsageBatch(keyIds: string[]): Promise<Record<string, ApiKeyBatchStats>> {
     await this.ensureValidToken();
 
@@ -226,12 +231,13 @@ export class ApiClient {
     const usageStats = await this.getUsageStats(shareableItems.map(item => item.id));
 
     return shareableItems.map((item) => {
+      const sanitizedItem = this.sanitizeApiKeyItem(item);
       const stats = usageStats.get(item.id);
       const cost = Number(stats?.cost ?? 0);
       const formattedCost = stats?.formattedCost ?? `$${cost.toFixed(2)}`;
 
       return {
-        ...item,
+        ...sanitizedItem,
         usage: {
           total: {
             cost,
