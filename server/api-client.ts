@@ -6,24 +6,16 @@ interface LoginResponse {
 
 interface ApiKeysResponse {
   success: boolean;
-  data: Array<{
-    id: string;
-    name: string;
-    tags: string[];
-    usage: {
-      total: {
-        cost: number;
-        tokens: number;
-        inputTokens: number;
-        outputTokens: number;
-        cacheCreateTokens: number;
-        cacheReadTokens: number;
-        requests: number;
-        formattedCost: string;
-      };
+  data: {
+    items: ApiKeyListItem[];
+    pagination: {
+      page: number;
+      pageSize: number;
+      total: number;
+      totalPages: number;
     };
-    [key: string]: any;
-  }>;
+    availableTags: string[];
+  };
 }
 
 interface KeyIdResponse {
@@ -31,6 +23,48 @@ interface KeyIdResponse {
   data: {
     id: string;
   };
+}
+
+interface ApiKeyListItem {
+  id: string;
+  name: string;
+  tags: string[];
+  apiKey?: string;
+  [key: string]: any;
+}
+
+interface ApiKeyUsageTotals {
+  cost: number;
+  tokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreateTokens: number;
+  cacheReadTokens: number;
+  requests: number;
+  formattedCost: string;
+}
+
+interface ApiKeyWithUsage extends ApiKeyListItem {
+  usage: {
+    total: ApiKeyUsageTotals;
+  };
+}
+
+interface BatchStatsResponse {
+  success: boolean;
+  data: Record<string, ApiKeyBatchStats>;
+}
+
+interface ApiKeyBatchStats {
+  requests: number;
+  tokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreateTokens: number;
+  cacheReadTokens: number;
+  cost: number;
+  formattedCost?: string;
+  [key: string]: any;
 }
 
 export class ApiClient {
@@ -103,31 +137,118 @@ export class ApiClient {
     }
   }
 
-  async getCurrentCosts(): Promise<ApiKeysResponse['data']> {
+  private async fetchApiKeysPage(page: number, pageSize: number): Promise<ApiKeysResponse['data']> {
     await this.ensureValidToken();
 
-    const response = await fetch(`${this.baseUrl}/admin/api-keys?timeRange=all`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await fetch(
+      `${this.baseUrl}/admin/api-keys?page=${page}&pageSize=${pageSize}&searchMode=apiKey&sortBy=createdAt&sortOrder=desc&timeRange=all`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch current costs: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch api keys: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json() as ApiKeysResponse;
     
-    if (!data.success || !Array.isArray(data.data)) {
+    if (!data.success || !data.data?.items || !data.data?.pagination) {
       throw new Error('Invalid response format from admin/api-keys');
     }
 
-    return data.data.filter(user => !user.tags.includes("noshare"));
+    return data.data;
   }
 
-  async getKeyId(apiKey: string): Promise<string> {
+  private async fetchUsageBatch(keyIds: string[]): Promise<Record<string, ApiKeyBatchStats>> {
+    await this.ensureValidToken();
+
+    const response = await fetch(`${this.baseUrl}/admin/api-keys/batch-stats`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        keyIds,
+        timeRange: 'all',
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch usage stats: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json() as BatchStatsResponse;
+
+    if (!data.success || !data.data) {
+      throw new Error('Invalid response format from admin/api-keys/batch-stats');
+    }
+
+    return data.data;
+  }
+
+  private async getUsageStats(keyIds: string[]): Promise<Map<string, ApiKeyBatchStats>> {
+    const usageMap = new Map<string, ApiKeyBatchStats>();
+    const batchSize = 10;
+
+    for (let i = 0; i < keyIds.length; i += batchSize) {
+      const batch = keyIds.slice(i, i + batchSize);
+      if (batch.length === 0) continue;
+
+      const batchData = await this.fetchUsageBatch(batch);
+      for (const [id, stats] of Object.entries(batchData)) {
+        usageMap.set(id, stats);
+      }
+    }
+
+    return usageMap;
+  }
+
+  async getCurrentCosts(): Promise<ApiKeyWithUsage[]> {
+    const pageSize = 50;
+    let page = 1;
+    let totalPages = 1;
+    const allItems: ApiKeyListItem[] = [];
+
+    while (page <= totalPages) {
+      const data = await this.fetchApiKeysPage(page, pageSize);
+      allItems.push(...data.items);
+      totalPages = data.pagination.totalPages || page;
+      page += 1;
+    }
+
+    const shareableItems = allItems.filter(user => !user.tags?.includes("noshare"));
+    const usageStats = await this.getUsageStats(shareableItems.map(item => item.id));
+
+    return shareableItems.map((item) => {
+      const stats = usageStats.get(item.id);
+      const cost = Number(stats?.cost ?? 0);
+      const formattedCost = stats?.formattedCost ?? `$${cost.toFixed(2)}`;
+
+      return {
+        ...item,
+        usage: {
+          total: {
+            cost,
+            tokens: Number(stats?.tokens ?? 0),
+            inputTokens: Number(stats?.inputTokens ?? 0),
+            outputTokens: Number(stats?.outputTokens ?? 0),
+            cacheCreateTokens: Number(stats?.cacheCreateTokens ?? 0),
+            cacheReadTokens: Number(stats?.cacheReadTokens ?? 0),
+            requests: Number(stats?.requests ?? 0),
+            formattedCost,
+          },
+        },
+      };
+    });
+  }
+
+  private async getKeyIdFromLegacy(apiKey: string): Promise<string> {
     const response = await fetch(`${this.baseUrl}/apiStats/api/get-key-id`, {
       method: 'POST',
       headers: {
@@ -149,6 +270,33 @@ export class ApiClient {
     }
 
     return data.data.id;
+  }
+
+  private async getKeyIdFromList(apiKey: string): Promise<string> {
+    const pageSize = 50;
+    let page = 1;
+    let totalPages = 1;
+
+    while (page <= totalPages) {
+      const data = await this.fetchApiKeysPage(page, pageSize);
+      const match = data.items.find(item => item.apiKey === apiKey);
+      if (match?.id) {
+        return match.id;
+      }
+
+      totalPages = data.pagination.totalPages || page;
+      page += 1;
+    }
+
+    throw new Error('Invalid API key or response format');
+  }
+
+  async getKeyId(apiKey: string): Promise<string> {
+    try {
+      return await this.getKeyIdFromLegacy(apiKey);
+    } catch (error) {
+      return await this.getKeyIdFromList(apiKey);
+    }
   }
 }
 
