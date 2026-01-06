@@ -66,24 +66,29 @@ export function HistoricalPeriods({ periods, apiKey, userId }: HistoricalPeriods
       setPeriodOptions(initialOptions);
       
       if (!selectedPeriod && initialOptions.length > 0) {
-        setSelectedPeriod(initialOptions[0].period);
+        const lastOption = initialOptions[initialOptions.length - 1];
+        if (lastOption) {
+          setSelectedPeriod(lastOption.period);
+        }
       }
-      
+
       // Fetch costs individually to update progressively
       const updatedOptions = [...initialOptions];
-      
+
       for (let i = 0; i < periods.length; i++) {
         const period = periods[i];
+        if (!period) continue;
+
         try {
           const response = await fetch(`/api/periods/${period.index}/summary`, {
             headers: { 'X-API-Key': apiKey },
           });
-          
+
           if (response.ok) {
             const data = await response.json();
-            updatedOptions[i] = { 
-              period, 
-              totalCost: data.totals?.totalCost || 0 
+            updatedOptions[i] = {
+              period,
+              totalCost: data.totals?.totalCost || 0
             };
           } else {
             updatedOptions[i] = { period, totalCost: 0 };
@@ -91,7 +96,7 @@ export function HistoricalPeriods({ periods, apiKey, userId }: HistoricalPeriods
         } catch {
           updatedOptions[i] = { period, totalCost: 0 };
         }
-        
+
         // Update state after each fetch for progressive loading
         setPeriodOptions([...updatedOptions]);
       }
@@ -102,7 +107,10 @@ export function HistoricalPeriods({ periods, apiKey, userId }: HistoricalPeriods
   
   useEffect(() => {
     if (periods.length > 0 && !selectedPeriod) {
-      setSelectedPeriod(periods[0] || null); // Select the most recent historical period
+      const lastPeriod = periods[periods.length - 1];
+      if (lastPeriod) {
+        setSelectedPeriod(lastPeriod); // Select the most recent historical period
+      }
     }
   }, [periods]);
 
