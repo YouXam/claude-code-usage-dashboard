@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CurrentPeriod } from './CurrentPeriod';
 import { HistoricalPeriods } from './HistoricalPeriods';
+import { AIAccounts } from './AIAccounts';
 
 interface DashboardProps {
   apiKey: string;
@@ -110,6 +111,8 @@ export function Dashboard({ apiKey, userId, onLogout }: DashboardProps) {
       </nav>
 
       <div className="container mx-auto px-4 lg:px-8 max-w-6xl py-8">
+        <AIAccounts apiKey={apiKey} />
+
         <div className="mb-6">
           <div className="border-b border-border">
             <nav className="-mb-px flex space-x-8">

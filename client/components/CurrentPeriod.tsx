@@ -193,7 +193,7 @@ export function CurrentPeriod({ period, apiKey, userId }: CurrentPeriodProps) {
         <h3 className="text-lg font-medium text-card-foreground mb-2">Failed to Load Period Data</h3>
         <p className="text-muted-foreground mb-4">{error}</p>
         <button
-          onClick={fetchSummary}
+          onClick={() => fetchSummary()}
           className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
         >
           Retry

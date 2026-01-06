@@ -67,6 +67,84 @@ interface ApiKeyBatchStats {
   [key: string]: any;
 }
 
+// AI Account types
+interface ClaudeAccount {
+  id: string;
+  name: string;
+  status: string;
+  accountType: string;
+  lastUsedAt: string | null;
+  usage?: {
+    daily?: {
+      tokens: number;
+      requests: number;
+      cost: number;
+    };
+    sessionWindow?: {
+      totalTokens: number;
+      totalRequests: number;
+      totalCost: number;
+    };
+  };
+  sessionWindow?: {
+    hasActiveWindow: boolean;
+    windowStart: string;
+    windowEnd: string;
+    progress: number;
+    remainingTime: number;
+    sessionWindowStatus: string;
+  };
+  claudeUsage?: {
+    fiveHour?: {
+      utilization: number;
+      resetsAt: string;
+      remainingSeconds: number;
+    };
+    sevenDay?: {
+      utilization: number;
+      resetsAt: string;
+      remainingSeconds: number;
+    };
+    sevenDayOpus?: {
+      utilization: number;
+      resetsAt: string;
+      remainingSeconds: number;
+    };
+  };
+}
+
+interface OpenAIAccount {
+  id: string;
+  name: string;
+  status: string;
+  accountType: string;
+  lastUsedAt: string | null;
+  usage?: {
+    daily?: {
+      tokens: number;
+      requests: number;
+      cost: number;
+    };
+  };
+  codexUsage?: {
+    primary?: {
+      usedPercent: number;
+      resetAfterSeconds: number;
+      resetAt: string;
+    };
+    secondary?: {
+      usedPercent: number;
+      resetAfterSeconds: number;
+      resetAt: string;
+    };
+  };
+}
+
+interface AIAccountsResponse {
+  claude: ClaudeAccount[];
+  openai: OpenAIAccount[];
+}
+
 export class ApiClient {
   private baseUrl: string;
   private username: string;
@@ -303,6 +381,123 @@ export class ApiClient {
     } catch (error) {
       return await this.getKeyIdFromList(apiKey);
     }
+  }
+
+  async getAIAccounts(): Promise<AIAccountsResponse> {
+    await this.ensureValidToken();
+
+    // Fetch Claude accounts
+    const claudeResponse = await fetch(`${this.baseUrl}/admin/claude-accounts`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!claudeResponse.ok) {
+      throw new Error(`Failed to fetch claude accounts: ${claudeResponse.status}`);
+    }
+
+    const claudeData = await claudeResponse.json();
+
+    // Fetch OpenAI accounts
+    const openaiResponse = await fetch(`${this.baseUrl}/admin/openai-accounts`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!openaiResponse.ok) {
+      throw new Error(`Failed to fetch openai accounts: ${openaiResponse.status}`);
+    }
+
+    const openaiData = await openaiResponse.json();
+
+    // Filter and sanitize Claude accounts
+    const claudeAccounts = (claudeData.data || [])
+      .filter((acc: any) => acc.accountType === 'shared')
+      .map((acc: any) => ({
+        id: acc.id,
+        name: acc.name,
+        status: acc.status,
+        accountType: acc.accountType,
+        lastUsedAt: acc.lastUsedAt,
+        usage: acc.usage ? {
+          daily: acc.usage.daily ? {
+            tokens: acc.usage.daily.tokens || 0,
+            requests: acc.usage.daily.requests || 0,
+            cost: acc.usage.daily.cost || 0,
+          } : undefined,
+          sessionWindow: acc.usage.sessionWindow ? {
+            totalTokens: acc.usage.sessionWindow.totalTokens || 0,
+            totalRequests: acc.usage.sessionWindow.totalRequests || 0,
+            totalCost: acc.usage.sessionWindow.totalCost || 0,
+          } : undefined,
+        } : undefined,
+        sessionWindow: acc.sessionWindow ? {
+          hasActiveWindow: acc.sessionWindow.hasActiveWindow || false,
+          windowStart: acc.sessionWindow.windowStart || '',
+          windowEnd: acc.sessionWindow.windowEnd || '',
+          progress: acc.sessionWindow.progress || 0,
+          remainingTime: acc.sessionWindow.remainingTime || 0,
+          sessionWindowStatus: acc.sessionWindow.sessionWindowStatus || 'unknown',
+        } : undefined,
+        claudeUsage: acc.claudeUsage ? {
+          fiveHour: acc.claudeUsage.fiveHour ? {
+            utilization: acc.claudeUsage.fiveHour.utilization || 0,
+            resetsAt: acc.claudeUsage.fiveHour.resetsAt || '',
+            remainingSeconds: acc.claudeUsage.fiveHour.remainingSeconds || 0,
+          } : undefined,
+          sevenDay: acc.claudeUsage.sevenDay ? {
+            utilization: acc.claudeUsage.sevenDay.utilization || 0,
+            resetsAt: acc.claudeUsage.sevenDay.resetsAt || '',
+            remainingSeconds: acc.claudeUsage.sevenDay.remainingSeconds || 0,
+          } : undefined,
+          sevenDayOpus: acc.claudeUsage.sevenDayOpus ? {
+            utilization: acc.claudeUsage.sevenDayOpus.utilization || 0,
+            resetsAt: acc.claudeUsage.sevenDayOpus.resetsAt || '',
+            remainingSeconds: acc.claudeUsage.sevenDayOpus.remainingSeconds || 0,
+          } : undefined,
+        } : undefined,
+      }));
+
+    // Filter and sanitize OpenAI accounts
+    const openaiAccounts = (openaiData.data || [])
+      .filter((acc: any) => acc.accountType === 'shared')
+      .map((acc: any) => ({
+        id: acc.id,
+        name: acc.name,
+        status: acc.status,
+        accountType: acc.accountType,
+        lastUsedAt: acc.lastUsedAt,
+        usage: acc.usage ? {
+          daily: acc.usage.daily ? {
+            tokens: acc.usage.daily.tokens || 0,
+            requests: acc.usage.daily.requests || 0,
+            cost: acc.usage.daily.cost || 0,
+          } : undefined,
+        } : undefined,
+        codexUsage: acc.codexUsage ? {
+          primary: acc.codexUsage.primary ? {
+            usedPercent: acc.codexUsage.primary.usedPercent || 0,
+            resetAfterSeconds: acc.codexUsage.primary.resetAfterSeconds || 0,
+            resetAt: acc.codexUsage.primary.resetAt || '',
+          } : undefined,
+          secondary: acc.codexUsage.secondary ? {
+            usedPercent: acc.codexUsage.secondary.usedPercent || 0,
+            resetAfterSeconds: acc.codexUsage.secondary.resetAfterSeconds || 0,
+            resetAt: acc.codexUsage.secondary.resetAt || '',
+          } : undefined,
+        } : undefined,
+      }));
+
+    return {
+      claude: claudeAccounts,
+      openai: openaiAccounts,
+    };
   }
 }
 

@@ -157,6 +157,31 @@ Bun.serve({
           });
         }
       }
+    },
+
+    '/api/ai-accounts': {
+      async GET(req: Request) {
+        const validation = await validateApiKey(req);
+        if (!validation.valid) {
+          return new Response(JSON.stringify({ error: validation.error }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          const accounts = await apiClient.getAIAccounts();
+          return new Response(JSON.stringify(accounts), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error('Error getting AI accounts:', error);
+          return new Response(JSON.stringify({ error: 'Failed to get AI accounts' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
     }
   },
   development: {
