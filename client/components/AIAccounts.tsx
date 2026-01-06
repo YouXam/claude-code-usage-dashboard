@@ -72,6 +72,7 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
   const [claudeAccounts, setClaudeAccounts] = useState<ClaudeAccount[]>([]);
   const [openaiAccounts, setOpenaiAccounts] = useState<OpenAIAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
@@ -80,7 +81,11 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
     return () => clearInterval(interval);
   }, [apiKey]);
 
-  const fetchAccounts = async () => {
+  const fetchAccounts = async (isRefresh = false) => {
+    if (isRefresh) {
+      setIsRefreshing(true);
+    }
+
     try {
       const response = await fetch('/api/ai-accounts', {
         headers: {
@@ -101,6 +106,9 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
       setError(err instanceof Error ? err.message : 'Failed to load AI accounts');
     } finally {
       setIsLoading(false);
+      if (isRefresh) {
+        setIsRefreshing(false);
+      }
     }
   };
 
@@ -187,7 +195,7 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
         <div className="text-center py-12">
           <p className="text-destructive">{error}</p>
           <button
-            onClick={fetchAccounts}
+            onClick={() => fetchAccounts(true)}
             className="mt-3 text-sm text-primary hover:underline"
           >
             Retry
@@ -200,7 +208,24 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
   return (
     <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden mb-6">
       <div className="px-6 py-4 border-b border-border">
-        <h3 className="text-lg font-medium text-card-foreground">AI Accounts Status</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-card-foreground">AI Accounts Status</h3>
+          <button
+            onClick={() => fetchAccounts(true)}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {allAccounts.length > 0 ? (
