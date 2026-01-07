@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { UsageProgressBar } from './UsageProgressBar';
 
 interface ClaudeAccount {
@@ -73,17 +73,20 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
   const [openaiAccounts, setOpenaiAccounts] = useState<OpenAIAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string>('');
+  const [refreshError, setRefreshError] = useState<string>('');
+  const [initialError, setInitialError] = useState<string>('');
+  const hasLoadedDataRef = useRef(false);
 
   useEffect(() => {
-    fetchAccounts();
-    const interval = setInterval(fetchAccounts, 30000);
+    fetchAccounts('initial');
+    const interval = setInterval(() => fetchAccounts('auto'), 30000);
     return () => clearInterval(interval);
   }, [apiKey]);
 
-  const fetchAccounts = async (isRefresh = false) => {
-    if (isRefresh) {
+  const fetchAccounts = async (type: 'initial' | 'manual' | 'auto' = 'auto') => {
+    if (type === 'manual') {
       setIsRefreshing(true);
+      setRefreshError('');
     }
 
     try {
@@ -100,16 +103,32 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
       const data = await response.json();
       setClaudeAccounts(data.claude || []);
       setOpenaiAccounts(data.openai || []);
-      setError('');
+      setRefreshError('');
+      setInitialError('');
+      hasLoadedDataRef.current = true;
     } catch (err) {
       console.error('Error fetching AI accounts:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load AI accounts');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load AI accounts';
+
+      if (type === 'initial') {
+        setInitialError(errorMessage);
+      } else if (hasLoadedDataRef.current) {
+        // Only set refresh error if we have previously loaded data successfully
+        setRefreshError(errorMessage);
+      }
     } finally {
-      setIsLoading(false);
-      if (isRefresh) {
+      if (type === 'initial') {
+        setIsLoading(false);
+      }
+      if (type === 'manual') {
         setIsRefreshing(false);
       }
     }
+  };
+
+  const handleRetry = () => {
+    setRefreshError('');
+    fetchAccounts('manual');
   };
 
   const formatLastUsed = (lastUsedAt: string | null) => {
@@ -125,20 +144,6 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
     if (diffHours < 24) return `${diffHours}h ago`;
     const diffDays = Math.floor(diffHours / 24);
     return `${diffDays}d ago`;
-  };
-
-  const formatTime = (seconds: number) => {
-    if (seconds <= 0) return '0m';
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-
-    if (days > 0) {
-      if (hours > 0) return `${days}d ${hours}h`;
-      return `${days}d`;
-    }
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
   };
 
   const getStatusColor = (status: string) => {
@@ -186,16 +191,16 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
     );
   }
 
-  if (error) {
+  if (initialError) {
     return (
       <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden mb-6">
         <div className="px-6 py-4 border-b border-border">
           <h3 className="text-lg font-medium text-card-foreground">AI Accounts Status</h3>
         </div>
         <div className="text-center py-12">
-          <p className="text-destructive">{error}</p>
+          <p className="text-destructive">{initialError}</p>
           <button
-            onClick={() => fetchAccounts(true)}
+            onClick={() => fetchAccounts('initial')}
             className="mt-3 text-sm text-primary hover:underline"
           >
             Retry
@@ -210,21 +215,34 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
       <div className="px-6 py-4 border-b border-border">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-card-foreground">AI Accounts Status</h3>
-          <button
-            onClick={() => fetchAccounts(true)}
-            disabled={isRefreshing}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg
-              className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+          <div className="flex items-center gap-3">
+            {refreshError && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-destructive">{refreshError}</span>
+                <button
+                  onClick={handleRetry}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => fetchAccounts('manual')}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
+              <svg
+                className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -275,27 +293,21 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
                           {claudeAcc.claudeUsage.fiveHour && (
                             <UsageProgressBar
                               label="5h Window"
-                              resetTime={formatTime(claudeAcc.claudeUsage.fiveHour.remainingSeconds)}
                               percentage={claudeAcc.claudeUsage.fiveHour.utilization}
-                              resetAfterSeconds={claudeAcc.claudeUsage.fiveHour.remainingSeconds}
                               resetAt={claudeAcc.claudeUsage.fiveHour.resetsAt}
                             />
                           )}
                           {claudeAcc.claudeUsage.sevenDay && (
                             <UsageProgressBar
                               label="7d Window"
-                              resetTime={formatTime(claudeAcc.claudeUsage.sevenDay.remainingSeconds)}
                               percentage={claudeAcc.claudeUsage.sevenDay.utilization}
-                              resetAfterSeconds={claudeAcc.claudeUsage.sevenDay.remainingSeconds}
                               resetAt={claudeAcc.claudeUsage.sevenDay.resetsAt}
                             />
                           )}
                           {claudeAcc.claudeUsage.sevenDayOpus && (
                             <UsageProgressBar
                               label="Opus Window"
-                              resetTime={formatTime(claudeAcc.claudeUsage.sevenDayOpus.remainingSeconds)}
                               percentage={claudeAcc.claudeUsage.sevenDayOpus.utilization}
-                              resetAfterSeconds={claudeAcc.claudeUsage.sevenDayOpus.remainingSeconds}
                               resetAt={claudeAcc.claudeUsage.sevenDayOpus.resetsAt}
                             />
                           )}
@@ -305,18 +317,14 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
                           {openaiAcc.codexUsage.primary && (
                             <UsageProgressBar
                               label="5h Window"
-                              resetTime={formatTime(openaiAcc.codexUsage.primary.resetAfterSeconds)}
                               percentage={openaiAcc.codexUsage.primary.usedPercent}
-                              resetAfterSeconds={openaiAcc.codexUsage.primary.resetAfterSeconds}
                               resetAt={openaiAcc.codexUsage.primary.resetAt}
                             />
                           )}
                           {openaiAcc.codexUsage.secondary && (
                             <UsageProgressBar
                               label="7d Window"
-                              resetTime={formatTime(openaiAcc.codexUsage.secondary.resetAfterSeconds)}
                               percentage={openaiAcc.codexUsage.secondary.usedPercent}
-                              resetAfterSeconds={openaiAcc.codexUsage.secondary.resetAfterSeconds}
                               resetAt={openaiAcc.codexUsage.secondary.resetAt}
                             />
                           )}
