@@ -74,6 +74,8 @@ interface ClaudeAccount {
   status: string;
   accountType: string;
   lastUsedAt: string | null;
+  schedulable?: boolean;
+  stoppedReason?: string;
   usage?: {
     daily?: {
       tokens: number;
@@ -119,6 +121,8 @@ interface OpenAIAccount {
   status: string;
   accountType: string;
   lastUsedAt: string | null;
+  schedulable?: boolean;
+  stoppedReason?: string;
   usage?: {
     daily?: {
       tokens: number;
@@ -425,6 +429,8 @@ export class ApiClient {
         status: acc.status,
         accountType: acc.accountType,
         lastUsedAt: acc.lastUsedAt,
+        schedulable: acc.schedulable,
+        stoppedReason: acc.stoppedReason ?? undefined,
         usage: acc.usage ? {
           daily: acc.usage.daily ? {
             tokens: acc.usage.daily.tokens || 0,
@@ -473,6 +479,8 @@ export class ApiClient {
         status: acc.status,
         accountType: acc.accountType,
         lastUsedAt: acc.lastUsedAt,
+        schedulable: acc.schedulable,
+        stoppedReason: acc.stoppedReason ?? undefined,
         usage: acc.usage ? {
           daily: acc.usage.daily ? {
             tokens: acc.usage.daily.tokens || 0,

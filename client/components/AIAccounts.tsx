@@ -7,6 +7,8 @@ interface ClaudeAccount {
   status: string;
   accountType: string;
   lastUsedAt: string | null;
+  schedulable?: boolean;
+  stoppedReason?: string;
   usage?: {
     daily?: {
       tokens: number;
@@ -39,6 +41,8 @@ interface OpenAIAccount {
   status: string;
   accountType: string;
   lastUsedAt: string | null;
+  schedulable?: boolean;
+  stoppedReason?: string;
   usage?: {
     daily?: {
       tokens: number;
@@ -253,9 +257,9 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Account</th>
                 <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Daily Usage</th>
-                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Usage Windows</th>
-                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Last Used</th>
+                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider min-w-[120px]">Daily Usage</th>
+                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider min-w-[200px]">Usage Windows</th>
+                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider min-w-[110px]">Last Used</th>
               </tr>
             </thead>
             <tbody className="bg-card divide-y divide-border">
@@ -273,11 +277,36 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
                       </div>
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(account.status)}`}>
-                        {account.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(account.status)}`}>
+                          {account.status}
+                        </span>
+                        {account.schedulable === false && (
+                          <span className="relative inline-flex items-center group">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-destructive/15 text-destructive cursor-pointer">
+                              Not schedulable
+                              <svg
+                                className="ml-1 h-3 w-3"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <circle cx="12" cy="12" r="9" />
+                                <path d="M12 8h.01M11 12h1v4h1" />
+                              </svg>
+                            </span>
+                            <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-max -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-sm opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              {account.stoppedReason || 'Not schedulable'}
+                            </span>
+                          </span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 min-w-[120px]">
                       {account.usage?.daily && (isClaudeAccount || account.usage.daily.requests > 0) ? (
                         <div className="text-xs">
                           <div className="text-muted-foreground">{account.usage.daily.requests} reqs</div>
@@ -287,7 +316,7 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
                         <span className="text-muted-foreground text-xs">{isClaudeAccount ? 'No data' : 'No usage today'}</span>
                       )}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 min-w-[300px]">
                       {claudeAcc?.claudeUsage ? (
                         <div className="space-y-1.5 min-w-[180px]">
                           {claudeAcc.claudeUsage.fiveHour && (
@@ -333,7 +362,7 @@ export function AIAccounts({ apiKey }: AIAccountsProps) {
                         <span className="text-muted-foreground text-xs">No data</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs text-left">{formatLastUsed(account.lastUsedAt)}</td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs text-left min-w-[110px]">{formatLastUsed(account.lastUsedAt)}</td>
                   </tr>
                 );
               })}
